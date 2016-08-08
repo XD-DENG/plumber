@@ -4,7 +4,7 @@ NULL
 
 .globals <- new.env()
 .globals$serializers <- list()
-.globals$processors <- list()
+.globals$processors <- new.env()
 
 verbs <- c("GET", "PUT", "POST", "DELETE")
 enumerateVerbs <- function(v){
@@ -26,7 +26,9 @@ stopOnLine <- function(private, line, msg){
 #'
 #' See \url{http://plumber.trestletech.com/docs/programmatic/} for additional
 #' details on the methods available on this object.
+#' @param file The file to parse as the plumber router definition
 #' @export
+#' @importFrom httpuv runServer
 plumber <- R6Class(
   "plumber",
   public = list(
@@ -213,23 +215,23 @@ plumber <- R6Class(
     onWSOpen = function(ws){ #httpuv interface
       warning("WebSockets not supported")
     },
-    #' @param verbs The verb(s) which this endpoint supports
-    #' @param path The path for the endpoint
-    #' @param expr The expression encapsulating the endpoint's logic
-    #' @param serializer The name of the serializer to use (if not the default)
-    #' @param processors Any \code{PlumberProcessors} to apply to this endpoint
-    #' @param preempt The name of the filter before which this endpoint should
-    #'   be inserted. If not specified the endpoint will be added after all
-    #'   the filters.
+    #* @param verbs The verb(s) which this endpoint supports
+    #* @param path The path for the endpoint
+    #* @param expr The expression encapsulating the endpoint's logic
+    #* @param serializer The name of the serializer to use (if not the default)
+    #* @param processors Any \code{PlumberProcessors} to apply to this endpoint
+    #* @param preempt The name of the filter before which this endpoint should
+    #*   be inserted. If not specified the endpoint will be added after all
+    #*   the filters.
     addEndpoint = function(verbs, path, expr, serializer, processors, preempt=NULL){
       private$addEndpointInternal(verbs, path, expr, serializer, processors, srcref, preempt)
     },
-    #' Adds a static asset server
-    #'
-    #' @param dir The directory on disk from which to serve static assets
-    #' @param path The path prefix at which the assets should be made available
-    #' @param options A list of configuration options. Currently none are
-    #'   supported
+    #* Adds a static asset server
+    #*
+    #* @param dir The directory on disk from which to serve static assets
+    #* @param path The path prefix at which the assets should be made available
+    #* @param options A list of configuration options. Currently none are
+    #*   supported
     addAssets = function(dir, path="/public", options=list()){
       private$addAssetsInternal(dir, path, options)
     },
@@ -240,12 +242,12 @@ plumber <- R6Class(
     set404Handler = function(fun){
       private$notFoundHandler = fun
     },
-    #' @param name The name of the filter
-    #' @param expr The expression encapsulating the filter's logic
-    #' @param serializer (optional) A custom serializer to use when writing out
-    #'   data from this filter.
-    #' @param processors The \code{\link{PlumberProcessor}}s to apply to this
-    #'   filter.
+    #* @param name The name of the filter
+    #* @param expr The expression encapsulating the filter's logic
+    #* @param serializer (optional) A custom serializer to use when writing out
+    #*   data from this filter.
+    #* @param processors The \code{\link{PlumberProcessor}}s to apply to this
+    #*   filter.
     addFilter = function(name, expr, serializer, processors){
       "Create a new filter and add it to the router"
       private$addFilterInternal(name, expr, serializer, processors)
@@ -253,8 +255,22 @@ plumber <- R6Class(
     setSerializer = function(name){
       private$defaultSerializer <- name
     },
+    addGlobalProcessor = function(proc){
+      private$globalProcessors <- c(private$globalProcessors, proc)
+    },
     serve = function(req, res){
+      # Apply pre-routing logic
+      for ( p in private$globalProcessors ) {
+        p$pre(req=req, res=res)
+      }
+
       val <- self$route(req, res)
+
+      # Apply post-routing logic
+      for ( p in private$globalProcessors ) {
+        val <- p$post(value=val, req=req, res=res)
+      }
+
       ser <- res$serializer
 
       if (is.null(ser) || ser == ""){
@@ -296,7 +312,10 @@ plumber <- R6Class(
       req$args <- args
       path <- req$PATH_INFO
 
+      oldWarn <- options("warn")[[1]]
       tryCatch({
+        # Set to show warnings immediately as they happen.
+        options(warn=1)
 
         h <- getHandle("__first__")
         if (!is.null(h)){
@@ -353,7 +372,7 @@ plumber <- R6Class(
         # Error when filtering
         val <- private$errorHandler(req, res, e)
         return(val)
-      })
+      }, finally= options(warn=oldWarn) )
     },
     run = function(host='0.0.0.0', port=8000){
       # TODO: setwd to file path
@@ -379,6 +398,7 @@ plumber <- R6Class(
     parsed = NA,
     envir = NULL,
     defaultSerializer = "json",
+    globalProcessors = NULL,
     addFilterInternal = function(name, expr, serializer, processors, lines){
       "Create a new filter and add it to the router"
       filter <- PlumberFilter$new(name, expr, private$envir, serializer, processors, lines)
@@ -468,3 +488,4 @@ plumber <- R6Class(
 plumb <- function(file){
   plumber$new(file)
 }
+

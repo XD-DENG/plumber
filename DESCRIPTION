@@ -1,12 +1,12 @@
 Package: plumber
 Type: Package
 Title: An API Generator for R
-Version: 0.2.1
-Date: 2015-10-09
+Version: 0.2.3
+Date: 2016-02-02
 Authors@R: c(
   person(family="Trestle Technology, LLC", role="aut", email="cran@trestletechnology.net"),
   person("Jeff", "Allen", role="cre", email="cran@trestletechnology.net"))
-License: License: MIT + file LICENSE
+License: MIT + file LICENSE
 Description: Gives the ability to automatically generate and serve an HTTP API
     from R functions using the annotations in the R documentation around your
     functions.
@@ -21,7 +21,9 @@ LazyData: TRUE
 Suggests:
     testthat,
     XML,
-    rmarkdown
+    rmarkdown,
+    PKI,
+    base64enc
 Collate:
     'content-types.R'
     'plumber.R'
@@ -38,3 +40,5 @@ Collate:
     'serializer-json.R'
     'serializer-xml.R'
     'serializer.R'
+    'session-cookie.R'
+RoxygenNote: 5.0.1

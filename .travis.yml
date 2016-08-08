@@ -1,0 +1,13 @@
+language: r
+sudo: required
+r_binary_packages:
+  - testthat
+  - xml
+  - base64enc
+  - rmarkdown
+  - stringi
+  - jsonlite
+  - httpuv
+r_packages:
+  - PKI
+warnings_are_errors: true
